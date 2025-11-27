@@ -99,7 +99,7 @@ function determineResult() {
     // So if arrow is at `angle`, the tip is pointing at `angle`.
     
     // Normalizing angle to 0-360
-    let finalAngle = angle % 360;
+    let finalAngle = (angle + 45) % 360;
     
     // Calculate Segment
     // The board is divided into 4 quadrants (Limbs)
@@ -191,7 +191,7 @@ function drawBoard(ctx, r) {
     // We rotate context to draw each quadrant easily
     for (let i = 0; i < 4; i++) {
         ctx.save();
-        ctx.rotate((i * 90 * Math.PI) / 180);
+        ctx.rotate(((i * 90 - 45) * Math.PI) / 180);
         
         // Draw Limb Label in the corner
         // This is visually centered in the 90 degree slice
