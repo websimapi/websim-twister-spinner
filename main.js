@@ -24,6 +24,8 @@ let velocity = 0;
 let isSpinning = false;
 let friction = 0.985;
 let lastTickAngle = 0;
+let currentKeyword = 'spin';
+let isSettingKeyword = false;
 
 // Resize Handler
 function resize() {
@@ -71,22 +73,94 @@ document.addEventListener('pointerdown', (e) => {
 if (!voice.supported) {
     micBtn.style.display = 'none';
 } else {
+    let pressTimer = null;
+    let isLongPress = false;
+
+    const onVoiceResult = (transcript) => {
+        const cleanText = transcript.trim().toLowerCase();
+        
+        if (isSettingKeyword) {
+            // New keyword detected
+            if (cleanText.length > 0) {
+                currentKeyword = cleanText;
+                isSettingKeyword = false;
+                
+                // Feedback
+                uiInstruction.textContent = `Keyword set: "${currentKeyword}"`;
+                audio.speak(`Keyword is now ${currentKeyword}`);
+                
+                micBtn.classList.remove('recording-setup');
+                micBtn.classList.add('active');
+                
+                setTimeout(() => {
+                    if (voice.isListening) {
+                        uiInstruction.textContent = `Say '${currentKeyword}'!`;
+                    }
+                }, 2000);
+            }
+        } else {
+            // Normal operation
+            if (cleanText.includes(currentKeyword)) {
+                startSpin();
+            }
+        }
+    };
+
+    const startPress = (e) => {
+        if (e.button !== 0 && e.type === 'pointerdown') return;
+        
+        isLongPress = false;
+        micBtn.classList.add('holding');
+        
+        pressTimer = setTimeout(() => {
+            isLongPress = true;
+            micBtn.classList.remove('holding');
+            
+            // Start keyword setup
+            isSettingKeyword = true;
+            micBtn.classList.add('recording-setup');
+            micBtn.classList.remove('active');
+            
+            uiInstruction.textContent = "Say new keyword...";
+            uiInstruction.style.opacity = '1';
+            audio.playTick(10);
+            audio.resume();
+            
+            // Ensure listening
+            if (!voice.isListening) {
+                voice.start(onVoiceResult);
+            } else {
+                // Update callback just in case, though we use the same function reference
+                voice.start(onVoiceResult);
+            }
+        }, 3000);
+    };
+
+    const endPress = () => {
+        clearTimeout(pressTimer);
+        micBtn.classList.remove('holding');
+    };
+
+    micBtn.addEventListener('pointerdown', startPress);
+    micBtn.addEventListener('pointerup', endPress);
+    micBtn.addEventListener('pointerleave', endPress);
+
     micBtn.addEventListener('click', () => {
+        if (isLongPress) return;
+
         audio.resume(); // Ensure audio context is ready
         
         if (voice.isListening) {
             voice.stop();
             micBtn.classList.remove('active');
+            micBtn.classList.remove('recording-setup');
+            isSettingKeyword = false;
             uiInstruction.textContent = "Tap to Spin!";
         } else {
-            const started = voice.start((transcript) => {
-                if (transcript.includes('spin')) {
-                    startSpin();
-                }
-            });
+            const started = voice.start(onVoiceResult);
             if (started) {
                 micBtn.classList.add('active');
-                uiInstruction.textContent = "Say 'Spin'!";
+                uiInstruction.textContent = `Say '${currentKeyword}'!`;
             }
         }
     });
@@ -163,7 +237,7 @@ function showResult(limb, colorName, colorHex) {
     uiResult.classList.add('visible');
     
     if (voice.isListening) {
-        uiInstruction.textContent = "Say 'Spin' again";
+        uiInstruction.textContent = `Say '${currentKeyword}' again`;
     } else {
         uiInstruction.textContent = "Tap to Spin Again";
     }
