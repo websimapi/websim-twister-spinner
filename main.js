@@ -70,9 +70,11 @@ function loop() {
 
     // Tick Sound Logic (16 segments = 22.5 degrees per segment)
     // We check if we crossed a segment boundary
+    // Adjust logic to match the visual sectors starting at -11.25 offset from axes
     const segmentAngle = 360 / 16;
-    const currentTick = Math.floor(angle / segmentAngle);
-    const lastTick = Math.floor(lastTickAngle / segmentAngle);
+    // Shift angle by half a segment to align ticks with color centers
+    const currentTick = Math.floor((angle + 11.25) / segmentAngle);
+    const lastTick = Math.floor((lastTickAngle + 11.25) / segmentAngle);
     
     if (currentTick !== lastTick) {
         audio.playTick(velocity);
@@ -94,28 +96,22 @@ function loop() {
 // Result Logic
 function determineResult() {
     // Determine which segment the arrow points to
-    // The visual arrow points UP (270 deg) usually, but we rotate the board or the arrow.
-    // In our draw function, we rotate the ARROW.
-    // So if arrow is at `angle`, the tip is pointing at `angle`.
     
     // Normalizing angle to 0-360
-    let finalAngle = (angle + 45) % 360;
+    let finalAngle = angle % 360;
     
-    // Calculate Segment
-    // The board is divided into 4 quadrants (Limbs)
-    // Each quadrant is divided into 4 colors.
-    // Let's assume Quadrants start at:
-    // 0-90: Limb 0
-    // 90-180: Limb 1
-    // 180-270: Limb 2
-    // 270-360: Limb 3
+    // Align with X-grid quadrants
+    // Visual sectors are [-45, 45] (Right), [45, 135] (Bottom), etc.
+    // adding 45 shifts [-45, 45] to [0, 90] range for easier indexing
+    let adjustedAngle = (finalAngle + 45) % 360;
+    if (adjustedAngle < 0) adjustedAngle += 360;
     
-    // Within each quadrant (90 degrees), there are 4 colors (22.5 degrees each)
-    
-    const quadrantIndex = Math.floor(finalAngle / 90);
+    const quadrantIndex = Math.floor(adjustedAngle / 90);
     const limb = LIMBS[quadrantIndex];
     
-    const angleInQuadrant = finalAngle % 90;
+    // Within the quadrant (0-90), determine color
+    const angleInQuadrant = adjustedAngle % 90;
+    // 4 colors fit in 90 degrees (22.5 each)
     const colorIndex = Math.floor(angleInQuadrant / 22.5);
     const colorHex = COLORS[colorIndex];
     const colorName = COLOR_NAMES[colorIndex];
@@ -188,60 +184,51 @@ function drawBoard(ctx, r) {
     ctx.shadowOffsetY = 0;
 
     // Draw Quadrants
-    // We rotate context to draw each quadrant easily
+    // We rotate context to draw each quadrant aligned with X grid axes
     for (let i = 0; i < 4; i++) {
         ctx.save();
-        ctx.rotate(((i * 90 - 45) * Math.PI) / 180);
+        // Rotate to 0, 90, 180, 270 to center on Right, Bottom, Left, Top
+        ctx.rotate((i * 90 * Math.PI) / 180);
         
-        // Draw Limb Label in the corner
-        // This is visually centered in the 90 degree slice
+        // Draw Limb Label
         ctx.fillStyle = '#333';
-        ctx.font = `bold ${r * 0.12}px Arial`;
+        ctx.font = `bold ${r * 0.14}px Arial`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         
-        // Position text
-        // Angle 45deg, distance r*0.75
-        const textDist = r * 0.85;
-        const textAngle = 45 * Math.PI / 180;
-        ctx.translate(Math.cos(textAngle) * textDist, Math.sin(textAngle) * textDist);
-        
-        // Rotate text to face center? Or face reader?
-        // Let's rotate it -45 so it's upright relative to the corner
-        ctx.rotate((45 * Math.PI) / 180); // Makes it perpendicular to corner diagonal
-        ctx.rotate((-90 * Math.PI) / 180); // Makes it readable from "bottom" of that quadrant
-        
+        // Position text centered on the edge of the triangle
+        ctx.save();
+        ctx.translate(r * 0.82, 0);
+        ctx.rotate(Math.PI / 2); // Rotate text to follow the edge
         ctx.fillText(LIMBS[i], 0, 0);
-        
         ctx.restore();
 
         // Draw Color Circles for this quadrant
-        // 4 colors between 0 and 90 degrees
-        // Positions: 11.25, 33.75, 56.25, 78.75
+        // Distributed within the +/- 45 degree wedge
         for (let j = 0; j < 4; j++) {
-            const sliceAngle = (j * 22.5 + 11.25);
+            // Map j (0-3) to angles centered around 0 axis
+            // j=0 -> -33.75, j=3 -> +33.75
+            const sliceAngle = (j - 1.5) * 22.5;
             const rads = (sliceAngle * Math.PI) / 180;
             
-            // Adjust loop rotation
-            const totalRot = (i * 90 * Math.PI) / 180;
-            
             const dotDist = r * 0.55;
-            const x = Math.cos(rads + totalRot) * dotDist;
-            const y = Math.sin(rads + totalRot) * dotDist;
+            const x = Math.cos(rads) * dotDist;
+            const y = Math.sin(rads) * dotDist;
 
             ctx.beginPath();
-            ctx.arc(x, y, r * 0.08, 0, Math.PI * 2);
+            ctx.arc(x, y, r * 0.085, 0, Math.PI * 2);
             ctx.fillStyle = COLORS[j];
             ctx.fill();
             ctx.strokeStyle = 'rgba(0,0,0,0.1)';
             ctx.lineWidth = 2;
             ctx.stroke();
         }
+        ctx.restore();
     }
     
-    // Draw Dividing Lines
+    // Draw Dividing Lines (X shape)
     ctx.strokeStyle = '#ddd';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.moveTo(-r, -r);
     ctx.lineTo(r, r);
