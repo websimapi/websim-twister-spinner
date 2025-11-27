@@ -76,12 +76,12 @@ if (!voice.supported) {
     let pressTimer = null;
     let isLongPress = false;
 
-    const onVoiceResult = (transcript) => {
+    const onVoiceResult = (transcript, isFinal) => {
         const cleanText = transcript.trim().toLowerCase();
         
         if (isSettingKeyword) {
             // New keyword detected
-            if (cleanText.length > 0) {
+            if (isFinal && cleanText.length > 0) {
                 currentKeyword = cleanText;
                 isSettingKeyword = false;
                 

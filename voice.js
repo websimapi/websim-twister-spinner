@@ -9,13 +9,15 @@ export class VoiceControl {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             this.recognition = new SpeechRecognition();
             this.recognition.continuous = true;
-            this.recognition.interimResults = false;
+            this.recognition.interimResults = true;
             this.recognition.lang = 'en-US';
 
             this.recognition.onresult = (event) => {
                 const last = event.results.length - 1;
-                const transcript = event.results[last][0].transcript.trim().toLowerCase();
-                if (this.callback) this.callback(transcript);
+                const result = event.results[last];
+                const transcript = result[0].transcript.trim().toLowerCase();
+                const isFinal = result.isFinal;
+                if (this.callback) this.callback(transcript, isFinal);
             };
 
             this.recognition.onerror = (event) => {
