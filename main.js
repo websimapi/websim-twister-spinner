@@ -1,4 +1,5 @@
 import { AudioManager } from './audio.js';
+import { VoiceControl } from './voice.js';
 import confetti from 'confetti';
 
 // Game Constants
@@ -11,8 +12,10 @@ const canvas = document.getElementById('spinner-canvas');
 const ctx = canvas.getContext('2d');
 const uiResult = document.getElementById('result-display');
 const uiInstruction = document.getElementById('instruction');
+const micBtn = document.getElementById('mic-toggle');
 
 const audio = new AudioManager();
+const voice = new VoiceControl();
 
 // State
 let width, height, size, radius;
@@ -41,7 +44,10 @@ window.addEventListener('resize', resize);
 // Input Handler
 function handleTap() {
     audio.resume();
-    
+    startSpin();
+}
+
+function startSpin() {
     if (isSpinning) return;
     
     // Start Spin
@@ -55,7 +61,36 @@ function handleTap() {
     requestAnimationFrame(loop);
 }
 
-document.addEventListener('pointerdown', handleTap);
+document.addEventListener('pointerdown', (e) => {
+    // Prevent spin if clicking the mic button
+    if (e.target.closest('#mic-toggle')) return;
+    handleTap();
+});
+
+// Voice Control Setup
+if (!voice.supported) {
+    micBtn.style.display = 'none';
+} else {
+    micBtn.addEventListener('click', () => {
+        audio.resume(); // Ensure audio context is ready
+        
+        if (voice.isListening) {
+            voice.stop();
+            micBtn.classList.remove('active');
+            uiInstruction.textContent = "Tap to Spin!";
+        } else {
+            const started = voice.start((transcript) => {
+                if (transcript.includes('spin')) {
+                    startSpin();
+                }
+            });
+            if (started) {
+                micBtn.classList.add('active');
+                uiInstruction.textContent = "Say 'Spin'!";
+            }
+        }
+    });
+}
 
 // Animation Loop
 function loop() {
@@ -126,8 +161,14 @@ function showResult(limb, colorName, colorHex) {
     uiResult.style.borderColor = colorHex;
     uiResult.style.color = colorHex === '#FFFF00' ? '#D4AC0D' : colorHex; // Darker yellow for text
     uiResult.classList.add('visible');
+    
+    if (voice.isListening) {
+        uiInstruction.textContent = "Say 'Spin' again";
+    } else {
+        uiInstruction.textContent = "Tap to Spin Again";
+    }
+    
     uiInstruction.style.opacity = '1';
-    uiInstruction.textContent = "Tap to Spin Again";
 
     // Text to Speech
     setTimeout(() => {
